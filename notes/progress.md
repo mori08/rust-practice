@@ -78,10 +78,21 @@
 - [x] クレート/cargo/crates.ioの関係（海運メタファー）、TOML
 - [x] `cargo add` — 依存追加、推移的依存とCargo.lock、フィーチャーフラグ（概観）、`rand`で実践
 
+### ファイルシステムとツール
+- [x] `fs::read_dir` — 二重のResult（ディレクトリを開く/列挙中の各エントリ）、`?`の2段構え、`let entry = entry?;`のシャドーイングイディオム
+- [x] `DirEntry` — `.path()`（PathBuf）/ `.file_name()` / `.metadata()`、`Metadata::modified()`で`SystemTime`
+- [x] `PathBuf`/`OsString`は`Display`未実装 — OSの文字列はUTF-8保証がないため。表示は`.display()`か`{:?}`
+- [x] letチェーン — `if let ... && let ...`（edition 2024）、clippyの`collapsible_if`
+- [x] `cargo clippy` — リンタ（clang-tidy相当）、`cargo fmt --check`との使い分け、コミット前チェックの習慣
+- [x] **マイルストーン: ウォッチャー段階1（単発スキャン）完成**（Issue #2、git運用は`notes/git.md`）
+
 ## 🔄 いま取り組み中
 
-- [ ] **CLIツール制作（最終目標）: ファイル変更ウォッチャー**
-  - 部品: ディレクトリ走査（read_dir）、ファイルメタデータと時刻、ループ、引数処理（clap）
+- [ ] **CLIツール制作（最終目標）: ファイル変更ウォッチャー**（Issue #2）
+  - [x] 段階1: 単発スキャン（read_dir、metadata、SystemTime）
+  - [ ] 段階2: 差分検知 — `HashMap<PathBuf, SystemTime>`の比較、`#[test]`入門 ← 次回ここから
+  - [ ] 段階3: ポーリングループ化（loop + thread::sleep）
+  - [ ] 段階4: clapによる引数処理
 - [ ] ライフタイム注釈 — `'a`。参照を返す関数で必要になる
 - [ ] テスト — `#[test]`と`cargo test`
 - [ ] （必要に応じて）ジェネリクス深掘り、Rc/RefCell、スレッド
