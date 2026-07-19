@@ -13,6 +13,8 @@
 - [x] 式ベースの戻り値 — ブロック最終式（セミコロンなし）が値になる。`return`は早期リターン用
 - [x] `println!` / `format!` — マクロ（`!`必須）、フォーマットのコンパイル時チェック、引数は自動借用
 - [x] `match` — タプルパターン、網羅性チェック、パターンの順序、`_`ワイルドカード
+- [x] マッチガード — `パターン if 条件 =>`。照合→ガード評価の順、falseなら次の腕へ落ちる。網羅性チェックはガードの中身を見ない（受け皿の腕が必要）。腕の区切りは`,`（腕は式）
+- [x] ターボフィッシュの位置 — メソッドがジェネリックなら`collect::<T>()`、型がジェネリックなら`Vec::<T>::new()`（式中の`<>`は比較演算子と曖昧なため）。型推論は戻り値の型からも逆向きに効くので省略できることが多い
 - [x] 命名規約 — 関数/変数は`snake_case`、型は`UpperCamelCase`（コンパイラが警告する）
 
 ### 所有権・借用（Rustの核心）
@@ -35,6 +37,7 @@
 ### enum
 - [x] `enum` — データ付きバリアント（直和型）、バリアントは型でなく値/コンストラクタ
 - [x] enumへの`impl`、`match self`での場合分け
+- [x] バリアントはenumの名前空間の中 — `Notice::Add(...)`とフルネームで書く（`Some`/`None`が裸で書けるのはpreludeがuse済みだから）
 - [x] 数値型の暗黙変換なし — `f64`に整数リテラル不可、変換は`as`で明示
 
 ### Option
@@ -52,6 +55,7 @@
 ### コレクション
 - [x] `Vec<T>` — `vec!`マクロ、push、`[]`（範囲外は実行時panic）vs `.get()`（Option）、`&v`で借用ループ、`for &n in`パターン、要素参照とpushのE0502（イテレータ無効化の静的防止）、Rangeとの違い（IntoIterator）
 - [x] `HashMap<K, V>` — `use`（includeと違い名前の別名）、insert/get、entry APIとEntry enum、`*`による書き込みデリファレンス、列挙順は毎回変わる（BTreeMapならキー順）
+- [x] `.keys()` / `contains_key` — 値を使わないループは`keys()`で意図を示す。「あるかないか」の2択は`match`より`if !contains_key`が読みやすい
 
 ### イテレータ
 - [x] `.iter()` / `into_iter()`（ムーブ）、`filter` / `map` / `sum` / `collect`、遅延評価
@@ -72,9 +76,12 @@
 - [x] デフォルトメソッド — 実装付きメソッド、`self.area()`など契約内メソッドを呼べる
 - [x] `Box<T>`（unique_ptr相当）と`Vec<Box<dyn Trait>>`（動的ディスパッチ、C++仮想関数相当）
 - [x] スーパートレイト `trait Shape: Debug`（紹介のみ）
+- [x] `From`/`Into`は表裏一体 — `From<A> for B`を実装すると`A`側に`.into()`が自動で生える（包括実装）。`.into()`は変換先を型推論に委ねる汎用変換で、パス専用ではない。失敗しうる変換は`parse()`の領分
+- [x] `#[derive(PartialEq)]` — `==`と`assert_eq!`に必要。derive Debugはdead_code解析で読み手に数えられないが、PartialEqは数えられる
 
 ### モジュールと外部クレート
 - [x] `mod name;`によるファイル分割、`use`、デフォルト非公開と`pub`（E0603 / E0451: フィールドは個別にpub）
+- [x] パスキーワード `crate` / `self` / `super` — ファイルパスの`/`・`.`・`..`相当。予約語で`r#`でも識別子にできない
 - [x] クレート/cargo/crates.ioの関係（海運メタファー）、TOML
 - [x] `cargo add` — 依存追加、推移的依存とCargo.lock、フィーチャーフラグ（概観）、`rand`で実践
 
@@ -86,15 +93,22 @@
 - [x] `cargo clippy` — リンタ（clang-tidy相当）、`cargo fmt --check`との使い分け、コミット前チェックの習慣
 - [x] **マイルストーン: ウォッチャー段階1（単発スキャン）完成**（Issue #2、git運用は`notes/git.md`）
 
+### テスト
+- [x] `#[test]` / `#[cfg(test)]` / `mod tests` — テストは言語と cargo に標準装備（C++のGoogleTestと対照的）。`use super::*;`で親の関数を持ち込み、`cargo test`で実行
+- [x] `assert_eq!` / `assert!` — 等しくなければpanic。失敗時は`left`（実際の値）/`right`（期待値）が表示される。`PartialEq`と`Debug`のderiveが必要
+- [x] テスト失敗の読み解き — 「実装が悪い」か「期待値が悪い」の2通りをまず疑う
+- [x] I/Oとロジックの分離 — 純粋関数は手作りデータでテストできる。テスト用`SystemTime`は`UNIX_EPOCH + Duration::from_secs(n)`で作る
+- [x] テスト専用の`use`は`mod tests`内に置く（通常ビルドのunused import警告を回避）
+- [x] **マイルストーン: ウォッチャー段階2（差分検知＋テスト4本）完成**（`diff`関数、enum `Notice`、Issue #2）
+
 ## 🔄 いま取り組み中
 
 - [ ] **CLIツール制作（最終目標）: ファイル変更ウォッチャー**（Issue #2）
   - [x] 段階1: 単発スキャン（read_dir、metadata、SystemTime）
-  - [ ] 段階2: 差分検知 — `HashMap<PathBuf, SystemTime>`の比較、`#[test]`入門 ← 次回ここから
-  - [ ] 段階3: ポーリングループ化（loop + thread::sleep）
+  - [x] 段階2: 差分検知 — `HashMap<PathBuf, SystemTime>`の比較、`#[test]`入門
+  - [ ] 段階3: ポーリングループ化（loop + thread::sleep） ← 次回ここから
   - [ ] 段階4: clapによる引数処理
 - [ ] ライフタイム注釈 — `'a`。参照を返す関数で必要になる
-- [ ] テスト — `#[test]`と`cargo test`
 - [ ] （必要に応じて）ジェネリクス深掘り、Rc/RefCell、スレッド
 
 ## 📚 参考
