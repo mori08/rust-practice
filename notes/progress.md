@@ -101,13 +101,22 @@
 - [x] テスト専用の`use`は`mod tests`内に置く（通常ビルドのunused import警告を回避）
 - [x] **マイルストーン: ウォッチャー段階2（差分検知＋テスト4本）完成**（`diff`関数、enum `Notice`、Issue #2）
 
+### 制御フローと時間
+- [x] `loop` vs `while true` — `loop`は`break 値`でループ自体が値を返せる、ラベル付きbreak（`'outer:`）で多重ループを脱出。clippyは`while true`を警告
+- [x] never型 `!` と unit型 `()` — breakなしの`loop`は`!`（あらゆる型に化けられるので後続の`Ok(())`が不要／unreachable警告）、`for`は必ず終わるので`()`（`Ok(())`が必要）。E0308のnote行が型を教えてくれる
+- [x] `thread::sleep(Duration::from_secs(n))` — ポーリング間隔。`Duration`は`from_secs`/`from_millis`など
+- [x] 参照からのムーブは禁止（E0507） — `&HashMap`のループで得る`path`は`&PathBuf`。`clone()`が要るのは「壊れるから」ではなく「壊れうるコードを最初から通さない」ため。C++の moved-from の未規定状態が型で消えている
+- [x] dead_code解析はテストからの呼び出しを数えない（`#[cfg(test)]`は通常ビルドに含まれないため）
+- [x] **マイルストーン: ウォッチャー段階3（ポーリングループ）完成**（Add/Update/Remove を実動作で確認、Issue #2）
+
 ## 🔄 いま取り組み中
 
 - [ ] **CLIツール制作（最終目標）: ファイル変更ウォッチャー**（Issue #2）
   - [x] 段階1: 単発スキャン（read_dir、metadata、SystemTime）
   - [x] 段階2: 差分検知 — `HashMap<PathBuf, SystemTime>`の比較、`#[test]`入門
-  - [ ] 段階3: ポーリングループ化（loop + thread::sleep） ← 次回ここから
-  - [ ] 段階4: clapによる引数処理
+  - [x] 段階3: ポーリングループ化（loop + thread::sleep）
+  - [ ] 段階4: clapによる引数処理 ← 次回ここから
+    - 現在 `for _ in 0..5` で回数を仮固定している。`--count` / `--interval` オプションとして引数に出す
 - [ ] ライフタイム注釈 — `'a`。参照を返す関数で必要になる
 - [ ] （必要に応じて）ジェネリクス深掘り、Rc/RefCell、スレッド
 

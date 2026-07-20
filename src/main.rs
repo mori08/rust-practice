@@ -2,6 +2,8 @@ use std::collections::HashMap;
 use std::fs;
 use std::io;
 use std::path::PathBuf;
+use std::thread;
+use std::time::Duration;
 use std::time::SystemTime;
 
 #[derive(Debug, PartialEq)]
@@ -50,7 +52,6 @@ fn diff(a: &HashMap<PathBuf, SystemTime>, b: &HashMap<PathBuf, SystemTime>) -> V
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::time::Duration;
 
     #[test]
     fn empty() {
@@ -112,11 +113,17 @@ fn main() -> Result<(), io::Error> {
     let path = std::env::args().nth(1).unwrap_or(".".to_string());
     println!("path : {}", path);
 
-    let a = scan(&path)?;
-    let b = scan(&path)?;
-    let r = diff(&a, &b);
+    let mut prev = scan(&path)?;
 
-    println!("{:#?}", r);
+    for _ in 0..5 {
+        thread::sleep(Duration::from_secs(1));
+        let current = scan(&path)?;
+        let notices = diff(&prev, &current);
+        for notice in notices {
+            println!("{:?}", notice);
+        }
+        prev = current;
+    }
 
     Ok(())
 }
