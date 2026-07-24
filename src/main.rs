@@ -1,3 +1,4 @@
+use clap::Parser;
 use std::collections::HashMap;
 use std::fs;
 use std::io;
@@ -109,15 +110,36 @@ mod test {
     }
 }
 
+#[derive(Parser)]
+struct Args {
+    #[arg(long)]
+    count: Option<u32>,
+
+    #[arg(short, long, default_value_t = 1)]
+    interval: u64,
+
+    #[arg(default_value = ".")]
+    path: String,
+}
+
 fn main() -> Result<(), io::Error> {
-    let path = std::env::args().nth(1).unwrap_or(".".to_string());
-    println!("path : {}", path);
+    let args = Args::parse();
+    println!("監視対象 > {}", args.path);
+    println!("間隔 > {} s", args.interval);
+    if let Some(n) = args.count {
+        println!("回数 > {}", n);
+    }
 
-    let mut prev = scan(&path)?;
+    let iter: Box<dyn Iterator<Item = u32>> = match args.count {
+        Some(n) => Box::new(0..n),
+        None => Box::new(0..),
+    };
 
-    for _ in 0..5 {
-        thread::sleep(Duration::from_secs(1));
-        let current = scan(&path)?;
+    let mut prev = scan(&args.path)?;
+
+    for _ in iter {
+        thread::sleep(Duration::from_secs(args.interval));
+        let current = scan(&args.path)?;
         let notices = diff(&prev, &current);
         for notice in notices {
             println!("{:?}", notice);

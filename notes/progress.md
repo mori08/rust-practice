@@ -109,14 +109,26 @@
 - [x] dead_code解析はテストからの呼び出しを数えない（`#[cfg(test)]`は通常ビルドに含まれないため）
 - [x] **マイルストーン: ウォッチャー段階3（ポーリングループ）完成**（Add/Update/Remove を実動作で確認、Issue #2）
 
+### CLI引数処理（clap）
+- [x] `#[derive(Parser)]` — 「ほしい引数の形」を構造体で宣言するだけで `parse()` と `--help` が自動生成される（`env::args().nth(1)` の手作業パースからの脱却）。C++の`cxxopts`/`boost::program_options`相当だがヘルプも自動
+- [x] フィーチャーフラグ `--features derive` — clapはデフォルト機能とオプトイン機能を分けており、`derive` はオプトイン。`cargo add clap --features derive` で有効化（`rand`に続くフィーチャー実践2回目）。`Cargo.toml` は features 指定でインラインテーブル `{ version = ..., features = [...] }` に格上げ
+- [x] 二段構えの属性 — 構造体に `#[derive(Parser)]`、フィールドに `#[arg(...)]`。`#[arg(long)]`=名前付きオプション`--count`、`short`=短縮形`-i`、**属性なし＝位置引数**（名前付きにする意図は明示が必要）。カンマは`#[arg(...)]`の丸括弧の**内側**に置く
+- [x] デフォルト値 — `default_value = "1"`（文字列版、`OsStr`へ変換される）vs `default_value_t = 1`（型付き版、フィールド型の値をそのまま。`Display`実装が必要）。数値には`_t`付きが素直。E0277「`From<{integer}>` not implemented for `OsStr`」は文字列版に数値を渡したサイン
+- [x] `Option<T>` フィールド — clapでは型を`Option<u32>`にするだけで「省略可・省略時`None`」になり `default_value_t` は不要（`Option`自体がデフォルトの役割）。`--help`の Usage 行で必須は裸、省略可は`[...]`で囲まれる（`[OPTIONS]`/`[PATH]`）
+- [x] `cargo run -- ...` の `--` — 区切りより前はcargo宛て、後ろはプログラム宛て。`--`なしだと`--count`をcargoが解釈して`unexpected argument`エラー（cargo自身が`-- --count`を使えとヒント）
+- [x] `Box<dyn Iterator<Item = u32>>` で分岐を統一 — 有限`0..n`（`Range`）と無限`0..`（`RangeFrom`、終端なしの無限イテレータ）は別型だが、トレイトオブジェクトの箱に入れれば1変数に統一でき、`for`ループ本体の重複を排除できる（`Vec<Box<dyn Shape>>`と同じ動的ディスパッチ）。型注釈を先に書くと`0..`の`Item`型が逆算で決まる。`Option<u32>`は`Copy`なので`if let`と`match`で2度読んでもムーブしない（`Option<String>`ならE0382）
+- [x] **マイルストーン: ウォッチャー段階4（clap引数処理）完成**（`--count`/`--interval`/`path`、無限監視デフォルト、Issue #2）
+
 ## 🔄 いま取り組み中
 
 - [ ] **CLIツール制作（最終目標）: ファイル変更ウォッチャー**（Issue #2）
   - [x] 段階1: 単発スキャン（read_dir、metadata、SystemTime）
   - [x] 段階2: 差分検知 — `HashMap<PathBuf, SystemTime>`の比較、`#[test]`入門
   - [x] 段階3: ポーリングループ化（loop + thread::sleep）
-  - [ ] 段階4: clapによる引数処理 ← 次回ここから
-    - 現在 `for _ in 0..5` で回数を仮固定している。`--count` / `--interval` オプションとして引数に出す
+  - [x] 段階4: clapによる引数処理 — `--count`(Option、無指定で無限監視)/`--interval`(default 1s)/`path`(位置引数、default ".")。`Box<dyn Iterator>`で有限/無限ループを統一
+  - [ ] 段階5: サブディレクトリの再帰スキャン ← 次回ここから
+    - 現在の `scan` は `fs::read_dir` で1階層のみ。サブディレクトリ内のファイル変更を検知できない（中身が変わるとディレクトリ自身のmtimeが変わり`Update(dir)`としてだけ現れる）
+    - まず自力再帰（`metadata.is_dir()`で判定し`scan`を再帰呼び出し＋HashMapマージ）で標準`read_dir`が1階層な理由を体感。その後 `walkdir`（再帰列挙）や `notify`（OSのファイル変更通知でポーリング自体をやめる）クレートへの置き換えを検討
 - [ ] ライフタイム注釈 — `'a`。参照を返す関数で必要になる
 - [ ] （必要に応じて）ジェネリクス深掘り、Rc/RefCell、スレッド
 
