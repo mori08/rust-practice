@@ -2,6 +2,7 @@ use clap::Parser;
 use std::collections::HashMap;
 use std::fs;
 use std::io;
+use std::path::Path;
 use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
@@ -14,16 +15,20 @@ enum Notice {
     Update(PathBuf),
 }
 
-fn scan(path: &str) -> Result<HashMap<PathBuf, SystemTime>, io::Error> {
+fn scan(path: &Path) -> Result<HashMap<PathBuf, SystemTime>, io::Error> {
     let mut map: HashMap<PathBuf, SystemTime> = HashMap::new();
 
     for entry in fs::read_dir(path)? {
         let entry = entry?;
 
-        if let Ok(metadata) = entry.metadata()
-            && let Ok(modified) = metadata.modified()
-        {
-            map.insert(entry.path(), modified);
+        if let Ok(metadata) = entry.metadata() {
+            if metadata.is_dir() {
+                map.extend(scan(&entry.path())?);
+                continue;
+            }
+            if let Ok(modified) = metadata.modified() {
+                map.insert(entry.path(), modified);
+            }
         }
     }
 
@@ -119,12 +124,12 @@ struct Args {
     interval: u64,
 
     #[arg(default_value = ".")]
-    path: String,
+    path: PathBuf,
 }
 
 fn main() -> Result<(), io::Error> {
     let args = Args::parse();
-    println!("監視対象 > {}", args.path);
+    println!("監視対象 > {}", args.path.display());
     println!("間隔 > {} s", args.interval);
     if let Some(n) = args.count {
         println!("回数 > {}", n);
