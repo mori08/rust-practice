@@ -131,16 +131,17 @@
 
 ## 🔄 いま取り組み中
 
-- [ ] **CLIツール制作（最終目標）: ファイル変更ウォッチャー**（Issue #2）
+- [ ] **CLIツール制作（最終目標）: ファイル変更ウォッチャー**
+  - 段階1〜5は Issue #2（クローズ済み）。以降は1テーマ1 Issue で運用する（`notes/git.md` 参照）
   - [x] 段階1: 単発スキャン（read_dir、metadata、SystemTime）
   - [x] 段階2: 差分検知 — `HashMap<PathBuf, SystemTime>`の比較、`#[test]`入門
   - [x] 段階3: ポーリングループ化（loop + thread::sleep）
   - [x] 段階4: clapによる引数処理 — `--count`(Option、無指定で無限監視)/`--interval`(default 1s)/`path`(位置引数、default ".")。`Box<dyn Iterator>`で有限/無限ループを統一
   - [x] 段階5: サブディレクトリの再帰スキャン — `metadata.is_dir()`で判定し`scan`を再帰呼び出し、`map.extend()`でマージ。ディレクトリ自身はmapに入れない（入れると中身の変更でディレクトリのmtimeも動き`Update(dir)`が重複する）。引数を`&str`→`&Path`に変更
-  - [ ] 段階6: 出力の整形 ← 次回ここから
+  - [ ] **出力の整形（Issue #3）← 次回ここから**
     - 現在は`{:?}`表示のため `Update("watch_dir\\sub\\b.txt")` と引用符・エスケープが出る
-    - `impl fmt::Display for Notice` を手書きする練習（`write!(f, ...)`、`match self`）。deriveでなく自分でトレイトを実装する初回。パスは`.display()`
-  - [ ] 段階7以降の候補: `walkdir`（再帰列挙クレート、`max_depth`/`follow_links`）への置き換え、`notify`（OSのファイル変更通知。ポーリング設計自体をやめる。mpscチャンネルが絡む）
+    - `impl fmt::Display for Notice` を手書きする練習（`fmt::Formatter`、`write!(f, ...)`、`match self`）。deriveでなく自分で標準トレイトを実装する初回。`Display`がderiveできない理由も考える。パスは`.display()`
+  - [ ] 未起票の候補（着手を決めた時点でIssueを立てる）: `walkdir`（再帰列挙クレート、`max_depth`/`follow_links`）への置き換え、`notify`（OSのファイル変更通知。ポーリング設計自体をやめる。mpscチャンネルが絡む）
     - 標準`read_dir`が1階層な理由 = 再帰は「シンボリックリンクを辿るか」「深さ制限」「エラー時に中断か継続か」など万人向けの既定値がなく、stdに入れると後方互換で直せなくなるため。stdは小さく、判断の分かれるものはエコシステムへ
 - [ ] ライフタイム注釈 — `'a`。参照を返す関数で必要になる
 - [ ] （必要に応じて）ジェネリクス深掘り、Rc/RefCell、スレッド
