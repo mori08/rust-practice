@@ -129,6 +129,22 @@
 - [x] clapの`default_value`に`PathBuf`は渡せない（`OsStr: From<PathBuf>`がない）。`PathBuf`は`Display`未実装なので`default_value_t`も不可 → `default_value = "."`の一択
 - [x] **マイルストーン: ウォッチャー段階5（再帰スキャン）完成**（3階層のAdd/Update/Removeを実動作で確認、Issue #2）
 
+### 標準トレイトの手実装（Display）
+- [x] `Display`はderiveできない — `Debug`は「構造体名とフィールドを並べる」だけで機械的に決まるので自動生成できるが、`Display`は「どう見せたいか」という設計判断なのでコンパイラに決めようがない。C++の`operator<<`を自分で書くのと同じ立場
+- [x] `impl fmt::Display for T` — 実装するのは`fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result`の1つだけ。docの`Required Methods`に載っている
+- [x] `fmt::Result`は型エイリアス（`type Result = Result<(), Error>`）。`io::Result<T>`も同様で、標準ライブラリは「モジュールごとに専用のResultエイリアスを置く」慣習を持つ。docのシグネチャは`std::fmt`の中から見た表記なので、外から書くときは`fmt::`修飾が要る（E0425）
+- [x] `write!(f, ...)` — `println!`と違い出力先`f`を第1引数に取る。**フォーマット文字列はリテラル必須**（`format argument must be a string literal`）。マクロはコンパイル時に展開されるため、`match`式が返す実行時の`String`は渡せない。これは「`{}`の個数と引数の個数をコンパイル時に検査できる」ことの裏返し。C++の`std::format`がconstexprなフォーマット文字列を要求するのと同じ事情
+- [x] `match`を式として使い各腕の`write!`をそのまま返す → `format!`で中間`String`を作らずに済む
+- [x] マッチエルゴノミクス — `self: &Notice`に対してパターンを`&Notice::Add(ref path)`でなく`Notice::Add(path)`と書け、`path`が自動で`&PathBuf`に束縛される。値で束縛されるとE0507（参照からのムーブ）になるので、ぶつからない側の解釈が自動で選ばれている
+- [x] `fmt::Formatter<'_>`の`'_`は匿名ライフタイム — 内部に出力先への参照を持つのでライフタイム引数を取るが、追跡不要なので`_`で書く。ライフタイム注釈の入口
+- [x] `match`から2値を持ち出す — `match`は値を1つしか返さないので、記号とパスを**タプル**にまとめて返し、`let (symbol, path) = match self { ... };`のタプルパターンで開く。**Rustにはアンパック演算子がない**ので`write!`にタプルを1つ渡しても`{}`2つには展開されない（Pythonの`.format(*t)`に相当するものがない）
+- [x] タプルパターンには括弧が要る（`let (a, b) = ...`）。パターンは値の形を写した鋳型なので、右辺が括弧付きなら左辺も括弧付き
+- [x] `let`は文なので末尾にセミコロンが要る — `match`が式でも`let`で受けた全体は文。最終式になれるのは`write!(...)`のほう
+- [x] `type`は予約語（型エイリアス宣言。C++の`using`/`typedef`相当）で変数名に使えない。ただし`r#type`と書けば識別子にできる。`r#`が効かないのは`crate`/`self`/`super`/`Self`などパス解決に関わる一部の語だけ
+- [x] 「差分だけを分岐させる」形 — 共通部分の書式を1箇所にまとめ、`match`は違い（記号1文字）だけを選ぶ。3つの腕が同じ型`(&str, &PathBuf)`を返すので`match`式の型が確定する
+- [x] `rustup doc --std` — ツールチェーン同梱のオフラインdoc。手元のrustcとバージョンが必ず一致する。`--book`で書籍、`cargo doc --open`は自分のクレート＋依存
+- [x] **マイルストーン: ウォッチャー段階6（出力の整形）完成**（`[+]`/`[*]`/`[-]`表示、Issue #3）
+
 ## 🔄 いま取り組み中
 
 - [ ] **CLIツール制作（最終目標）: ファイル変更ウォッチャー**
@@ -138,10 +154,8 @@
   - [x] 段階3: ポーリングループ化（loop + thread::sleep）
   - [x] 段階4: clapによる引数処理 — `--count`(Option、無指定で無限監視)/`--interval`(default 1s)/`path`(位置引数、default ".")。`Box<dyn Iterator>`で有限/無限ループを統一
   - [x] 段階5: サブディレクトリの再帰スキャン — `metadata.is_dir()`で判定し`scan`を再帰呼び出し、`map.extend()`でマージ。ディレクトリ自身はmapに入れない（入れると中身の変更でディレクトリのmtimeも動き`Update(dir)`が重複する）。引数を`&str`→`&Path`に変更
-  - [ ] **出力の整形（Issue #3）← 次回ここから**
-    - 現在は`{:?}`表示のため `Update("watch_dir\\sub\\b.txt")` と引用符・エスケープが出る
-    - `impl fmt::Display for Notice` を手書きする練習（`fmt::Formatter`、`write!(f, ...)`、`match self`）。deriveでなく自分で標準トレイトを実装する初回。`Display`がderiveできない理由も考える。パスは`.display()`
-  - [ ] 未起票の候補（着手を決めた時点でIssueを立てる）: `walkdir`（再帰列挙クレート、`max_depth`/`follow_links`）への置き換え、`notify`（OSのファイル変更通知。ポーリング設計自体をやめる。mpscチャンネルが絡む）
+  - [x] 段階6: 出力の整形（Issue #3、クローズ済み） — `impl fmt::Display for Notice`を手書き。`{:?}`の`Update("watch_dir\\sub\\b.txt")`から`[*] watch_dir\sub\b.txt`へ。deriveでなく自分で標準トレイトを実装する初回だった
+  - [ ] **← 次回ここから**: 未起票の候補（着手を決めた時点でIssueを立てる）: `walkdir`（再帰列挙クレート、`max_depth`/`follow_links`）への置き換え、`notify`（OSのファイル変更通知。ポーリング設計自体をやめる。mpscチャンネルが絡む）
     - 標準`read_dir`が1階層な理由 = 再帰は「シンボリックリンクを辿るか」「深さ制限」「エラー時に中断か継続か」など万人向けの既定値がなく、stdに入れると後方互換で直せなくなるため。stdは小さく、判断の分かれるものはエコシステムへ
 - [ ] ライフタイム注釈 — `'a`。参照を返す関数で必要になる
 - [ ] （必要に応じて）ジェネリクス深掘り、Rc/RefCell、スレッド

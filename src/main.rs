@@ -1,5 +1,6 @@
 use clap::Parser;
 use std::collections::HashMap;
+use std::fmt;
 use std::fs;
 use std::io;
 use std::path::Path;
@@ -13,6 +14,17 @@ enum Notice {
     Add(PathBuf),
     Remove(PathBuf),
     Update(PathBuf),
+}
+
+impl fmt::Display for Notice {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let (symbol, path) = match self {
+            Notice::Add(path) => ("+", path),
+            Notice::Remove(path) => ("-", path),
+            Notice::Update(path) => ("*", path),
+        };
+        write!(f, "[{}] {}", symbol, path.display())
+    }
 }
 
 fn scan(path: &Path) -> Result<HashMap<PathBuf, SystemTime>, io::Error> {
@@ -147,7 +159,7 @@ fn main() -> Result<(), io::Error> {
         let current = scan(&args.path)?;
         let notices = diff(&prev, &current);
         for notice in notices {
-            println!("{:?}", notice);
+            println!("{}", notice);
         }
         prev = current;
     }
