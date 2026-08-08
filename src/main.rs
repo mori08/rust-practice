@@ -1,13 +1,13 @@
 use clap::Parser;
 use std::collections::HashMap;
 use std::fmt;
-use std::fs;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
 use std::time::SystemTime;
+use walkdir::WalkDir;
 
 #[derive(Debug, PartialEq)]
 enum Notice {
@@ -29,18 +29,17 @@ impl fmt::Display for Notice {
 
 fn scan(path: &Path) -> Result<HashMap<PathBuf, SystemTime>, io::Error> {
     let mut map: HashMap<PathBuf, SystemTime> = HashMap::new();
-
-    for entry in fs::read_dir(path)? {
+    for entry in WalkDir::new(path) {
         let entry = entry?;
 
-        if let Ok(metadata) = entry.metadata() {
-            if metadata.is_dir() {
-                map.extend(scan(&entry.path())?);
-                continue;
-            }
-            if let Ok(modified) = metadata.modified() {
-                map.insert(entry.path(), modified);
-            }
+        if entry.file_type().is_dir() {
+            continue;
+        }
+
+        if let Ok(metadata) = entry.metadata()
+            && let Ok(modified) = metadata.modified()
+        {
+            map.insert(entry.into_path(), modified);
         }
     }
 
